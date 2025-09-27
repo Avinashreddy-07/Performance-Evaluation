@@ -1,0 +1,65 @@
+# Import required libraries
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from sklearn.multiclass import OneVsRestClassifier
+
+# 1. Load dataset and train kNN classifier
+iris = load_iris()
+X, y = iris.data, iris.target
+
+# Binarize labels for ROC curve (multi-class)
+y_bin = label_binarize(y, classes=[0, 1, 2])
+n_classes = y_bin.shape[1]
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42, stratify=y
+)
+
+# Train kNN (k=5)
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+
+# Predictions
+y_pred = knn.predict(X_test)
+
+# 2. Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:\n", cm)
+
+# 3. Accuracy, Precision, Recall, F1
+print("\nClassification Report:\n",
+      classification_report(y_test, y_pred, target_names=iris.target_names))
+
+# 4. ROC Curve & AUC (One-vs-Rest approach)
+knn_ovr = OneVsRestClassifier(KNeighborsClassifier(n_neighbors=5))
+knn_ovr.fit(X_train, label_binarize(y_train, classes=[0, 1, 2]))
+y_score = knn_ovr.predict_proba(X_test)
+
+# Binarize only test labels
+y_test_bin = label_binarize(y_test, classes=[0, 1, 2])
+
+fpr, tpr, roc_auc = {}, {}, {}
+for i in range(n_classes):
+    fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_score[:, i])
+    roc_auc[i] = auc(fpr[i], tpr[i])
+
+# Plot ROC Curve
+plt.figure(figsize=(8, 6))
+for i in range(n_classes):
+    plt.plot(fpr[i], tpr[i], lw=2,
+             label=f"ROC curve (class {iris.target_names[i]}) AUC = {roc_auc[i]:.2f}")
+
+plt.plot([0, 1], [0, 1], 'k--', lw=2)
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve - kNN Classifier (Iris)")
+plt.legend(loc="lower right")
+plt.show()
